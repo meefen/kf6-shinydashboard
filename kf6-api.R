@@ -4,12 +4,12 @@
 
 ### Load libraries
 library(httr)
-suppressMessages(library(jsonlite))
-suppressMessages(library(dplyr))
+library(jsonlite)
+library(dplyr)
+
 ### Load utility functions
 # source("../lib/utils/utils.R")
-
-ua <- user_agent("http://github.com/meefen/")
+# ua <- user_agent("http://github.com/meefen/")
 
 baseURL = "https://kf6.ikit.org/"
 token = NA
@@ -22,7 +22,7 @@ pword = "000000"
 loginURL = "auth/local/"
 userURL = "api/users/me"
 communityListURL = "api/users/myRegistrations"
-communityURL = "api/communities/"
+communityURL = paste0("api/communities/", communityId)
 asAuthorURL = paste0("api/authors/", communityId, "/me")
 communityViewsURL = paste0("api/communities/", communityId, "/views")
 communityAuthorsURL = paste0("api/communities/", communityId, "/authors")
@@ -31,167 +31,141 @@ communityGroupsURL = paste0("api/communities/", communityId, "/groups")
 communityObjectsURL = paste0("api/contributions/", communityId, "/search")
 communityRecordsURL = paste0("api/records/search/", communityId)
 
-### Generate a API call url by combining the base url and the path
+#' Generate a API call url by combining the base url and the path
+#' 
+#' @param API path
+#' 
+#' @return Full url
 get_url <- function(path) {
   modify_url(baseURL, path = path)
 }
 
-### Login / authenticate
-### Returns the token
-login <- function(path) {
+#' Generic function for GET requests
+#' 
+#' @param url API URL
+#' 
+#' @param token API token
+#' 
+#' @return Object from the GET request
+GET_request <- function(url, token) {
+  resp = GET(url, add_headers(authorization = paste0("Bearer ", token)))
+  
+  if (http_type(resp) != "application/json") {
+    stop("API did not return json", call. = FALSE)
+  }
+  
+  jsonlite::fromJSON(content(resp, "text"), simplifyVector = FALSE)
+}
+
+POST_request <- function(url, query, token) {
+  resp = POST(url, query = query, 
+              add_headers(authorization = paste0("Bearer ", token)))
+  
+  if (http_type(resp) != "application/json") {
+    stop("API did not return json", call. = FALSE)
+  }
+  
+  jsonlite::fromJSON(content(resp, "text"), simplifyVector = FALSE)
+}
+
+#' Login / authenticate
+#' 
+#' @param uname Username
+#' 
+#' @param pword Password
+#' 
+#' @return An API token to be used for API calls
+login <- function(host, uname, pword) {
+  baseURL <<- host
+  
   url = get_url(loginURL)
   
   resp = POST(url, query = list(userName = uname, password=pword))
   if (http_type(resp) != "application/json") {
     stop("API did not return json", call. = FALSE)
   }
+  # token = jsonlite::fromJSON(content(resp, "text"))$token
   
   return(jsonlite::fromJSON(content(resp, "text"))$token)
 }
 
-### List communities
+#' List communities the user is a member of
+#' 
+#' @param token The API token
+#' 
+#' @return A 2-col data frame with community `id` and `title`
 get_communities <- function(token) {
   url = get_url(communityListURL)
-  
-  resp = GET(url, add_headers(authorization = paste0("Bearer ", token)))
-  parsed = jsonlite::fromJSON(content(resp, "text"), simplifyVector = FALSE, flatten=T)
+  parsed = GET_request(url, token)
   
   sapply(parsed, function(c) {
     c(id=c$communityId, title=c[["_community"]]$title)
   }) %>% t() %>% data.frame()
 }
 
-
-set_baseURL <- function(url) {
-  baseURL <<- url;
-}
-
+#' Select a community
+#' 
+#' @param id Community id
 set_community <- function(id) {
-  communityId = id;
+  communityId = id
+  # communityId = "5924524e58316b59392b3edd"
 }
 
-
-
-
-
-connect <- function(method, path, data) {
-  url = get_url(path)
-  
-  req = list(
-    url = url,
-    type = method,
-    headers = list(
-      authorization = paste0('Bearer ', token)
-    )
-  )
-  if(data) {
-    req$contentType = 'application/json'
-    req$dataType = 'json'
-    req$data = JSON.stringify(data)
-  }
-  
-  # req.cache = false;
-  # $.ajax(req)
-  # .done(success)
-  # .fail(failure);
+#' Get information about a community
+#' 
+#' @param token The API token
+#' 
+#' @return A list containing relevant info
+get_community <- function(token) {
+  url = get_url(paste0("api/communities/", communityId))
+  GET_request(url, token)
 }
 
-# CreateCurlHandle <- function() {
-#   ### Create a curl handle that will be shared among API calls
-#   
-#   library(RCurl)
-#   curl = getCurlHandle()
-#   curlSetOpt(cookiejar = "", 
-#              followlocation = TRUE, 
-#              curl = curl) # do not need to read the cookies
-#   return(curl)
-# }
-# 
-# EnsureHost <- function(host) {
-#   ### Ensure host ends with '/'
-#   
-#   if(grepl("\\/$", host))
-#     host
-#   else
-#     paste0(host, "/")
-# }
-
-SelectCommunity <- function(host, sectionId, curl) {
-  ### Tell the server that we are going to use data from this community
-  ### Required for any futher data queries
-  
-  host = EnsureHost(host)
-  tryCatch({  
-    vURL = paste0(host, "rest/account/selectSection/", sectionId)
-    fromJSON(getURL(vURL, curl=curl), flatten=TRUE)
-  }, error = function(e) {
-    return(e)
-  })
+get_me <- function(token) {
+  url = get_url("api/users/me")
+  GET_request(url, token)
 }
 
-GetSectionPosts <- function(host, sectionId, curl) {
-  ### Get posts in a section
-  
-  host = EnsureHost(host)
-  pURL = paste0(host, postsURL, sectionId)
-  text = getURL(pURL, curl=curl)
-  text = CleanJSONText(text)
-  df = fromJSON(text, flatten = TRUE)
-  #   df = rjson::fromJSON(text)
-  df$body_text = StripHTMLTags(df$body)
-  return(df)
+get_me_as_author <- function(token) {
+  url = get_url(paste0("api/authors/", communityId, "/me"))
+  GET_request(url, token)
 }
 
-GetSectionViews <- function(host, sectionId, curl) {
-  ### Get views in a section
-  
-  host = EnsureHost(host)
-  vURL = paste0(host, viewsURL, sectionId)
-  views = fromJSON(getURL(vURL, curl=curl), flatten=TRUE)
-  views$created = StrpKFTime(views$created) # convert time
-  return(views)
+get_views <- function(token) {
+  url = get_url(paste0("api/communities/", communityId, "/views"))
+  GET_request(url, token)
 }
 
-GetView <- function(host, viewId, curl) {
-  ### Get view info
-  
-  host = EnsureHost(host)
-  vURL = paste0(host, viewURL, viewId)
-  view = fromJSON(getURL(vURL, curl=curl), flatten=TRUE)
-  view$viewPostRefs$postInfo.body_text = StripHTMLTags(view$viewPostRefs$postInfo.body)
-  return(view)
+get_authors <- function(token) {
+  url = get_url(paste0("api/communities/", communityId, "/authors"))
+  GET_request(url, token)
 }
 
-GetLogs <- function(host, viewIds, curl) {
-  ### Get post histories from views
-  ### Note: viewIds is a vector
-  
-  host = EnsureHost(host)
-  tryCatch({
-    logs = lapply(viewIds, function(viewId) {
-      vURL = paste0(host, "rest/mobile/getPostHistoriesForView/", viewId)
-      df = tryCatch(
-        fromJSON(getURL(vURL, curl=curl), flatten=TRUE),
-        error = function(e) NULL
-      )
-      if(!is.null(df) && ncol(df) == 5) 
-        df$userName <- NA # strangely some views returned df with 5 cols
-      return(df)
-    })
-    do.call("rbind", logs)
-  }, error = function(e) {
-    print(e)
-  })
+get_groups <- function(token) {
+  url = get_url(paste0("api/communities/", communityId, "/groups"))
+  GET_request(url, token)
 }
 
-GetAllAuthors <- function(host, sectionId, curl) {
-  ### Get all authors in a section / community
+get_object_counts <- function(token, query=NULL) {
+  query = list(pagesize = 10000, searchMode = "title")
+  url = get_url(paste0("api/communities/", communityId, "/search/count"))
+  POST_request(url, query, token)
+}
+
+get_objects <- function(token, query=NULL) {
+  query = list(pagesize = "10000", 
+               searchMode = "title",
+               contentType = 'application/json',
+               dataType = 'json')
+  url = get_url(paste0("api/communities/", communityId, "/search"))
   
-  host = EnsureHost(host)
-  tryCatch({  
-    vURL = paste0(host, "rest/mobile/getAllAuthors/", sectionId)
-    fromJSON(getURL(vURL, curl=curl), flatten=TRUE)
-  }, error = function(e) {
-    return(e)
-  })
+  resp = POST(url, query = query,
+              add_headers(authorization = paste0("Bearer ", token)))
+  POST_request(url, query, token)
+}
+
+get_links_from <- function(fromId, token) {
+  # fromId = "5938343358316b59392ebc15"
+  url = get_url(paste0("api/links/from/", fromId))
+  GET_request(url, token)
 }

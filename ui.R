@@ -2,76 +2,81 @@
 
 library(shiny)
 library(shinydashboard)
+library(shinyjs)
 
 tasks = dropdownMenu(type = "tasks", badgeStatus = "success",
-             taskItem(value = 90, color = "green", "Documentation"),
-             taskItem(value = 17, color = "aqua", "Project X"),
-             taskItem(value = 75, color = "yellow", "Server deployment"),
-             taskItem(value = 80, color = "red", "Overall project"))
+                     taskItem(value = 90, color = "green", "Documentation"),
+                     taskItem(value = 17, color = "aqua", "Project X"),
+                     taskItem(value = 75, color = "yellow", "Server deployment"),
+                     taskItem(value = 80, color = "red", "Overall project"))
 
 header <- dashboardHeader(title = "KF6 Shiny Dash",
                           dropdownMenuOutput("notifyMenu"),
                           tasks)
 
 sidebar <- dashboardSidebar(
+  useShinyjs(),
   sidebarMenu(
     menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
-    menuItem("Widgets", tabName = "widgets", icon = icon("th"),
-             badgeLabel = "empty", badgeColor = "green"),
-    # menuItem("Source code", icon = icon("file-code-o"), 
-    #          href = "https://github.com/meefen/"),
+    menuItem("My Contributions", tabName = "personal", icon = icon("th"), badgeLabel = "new", badgeColor = "green")
+    # menuItem("Source code", icon = icon("file-code-o"), href = "https://github.com/meefen/"),
+    # menuItem("Controls", icon = icon("gear"))
+  ),
+  sidebarMenu(
+    textInput("host", "Host:", "https://kf6.ikit.org/"),
     textInput("username", "Username:", "bodong.chen@gmail.com"),
     passwordInput("password", "Password:", "000000"),
-    actionButton("login", label = "Login"),
-    # menuItem("Controls", icon = icon("gear")),
-    h4("Controls"),
-    dateRangeInput("daterange", label="Date Range:")
-  )
+    actionButton("loginButton", label = "Login"),
+    id = "loginMenu"
+  ),
+  sidebarMenu(
+    dateRangeInput("daterange", label="Date Range:"),
+    id = "controlMenu"
+  ),
+  sidebarMenuOutput("userInfo")
 )
 
 body <- dashboardBody(
   tabItems(
-    # First tab content
+    # 1st tab content
     tabItem(tabName = "dashboard",
             fluidRow(
               box(title = "Communities", 
                   status = "primary",
-                  # background = "maroon",
                   solidHeader = TRUE, 
-                  DT::dataTableOutput("table")),
+                  DT::dataTableOutput("tabCommunities")),
               
               box(title = "Overview", 
                   status = "primary",
-                  # background = "maroon",
                   solidHeader = TRUE, 
                   plotOutput("plot1", height = 250))
-            ),
+            )
+    ),
+    
+    # 2nd tab content
+    tabItem(tabName = "personal",
+            h2("My Contributions"),
             
             # infoBoxes with fill=FALSE
             fluidRow(
               # A static infoBox
-              infoBox("New Orders", 10 * 2, icon = icon("credit-card")),
+              infoBoxOutput("communityBox"),
               # Dynamic infoBoxes
-              infoBoxOutput("progressBox"),
-              infoBoxOutput("approvalBox")
-            ),
-            
-            # infoBoxes with fill=TRUE
-            fluidRow(
-              infoBox("New Orders", 10 * 2, icon = icon("credit-card"), fill = TRUE),
-              infoBoxOutput("progressBox2"),
-              infoBoxOutput("approvalBox2")
-            ),
-            
-            fluidRow(
-              # Clicking this will increment the progress amount
-              box(width = 4, actionButton("count", "Increment progress"))
+              infoBoxOutput("writingBox"),
+              infoBoxOutput("readingBox")
             )
-    ),
-    
-    # Second tab content
-    tabItem(tabName = "widgets",
-            h2("Widgets tab content")
+            
+            # # infoBoxes with fill=TRUE
+            # fluidRow(
+            #   infoBox("New Orders", 10 * 2, icon = icon("credit-card"), fill = TRUE),
+            #   infoBoxOutput("progressBox2"),
+            #   infoBoxOutput("approvalBox2")
+            # ),
+            # 
+            # fluidRow(
+            #   # Clicking this will increment the progress amount
+            #   box(width = 4, actionButton("count", "Increment progress"))
+            # )
     )
   )
 )
