@@ -8,28 +8,25 @@ library(jsonlite)
 library(dplyr)
 
 ### Load utility functions
-# source("../lib/utils/utils.R")
-# ua <- user_agent("http://github.com/meefen/")
+# source("utils.R")
+ua <- user_agent("https://github.com/meefen/kf6-shinydashboard")
 
-baseURL = "https://kf6.ikit.org/"
-token = NA
-
-communityId = NA
-uname = "bodong.chen@gmail.com"
-pword = "000000"
+# token = NA
+# communityId = NA
 
 ### API URLs
+baseURL = "https://kf6.ikit.org/"
 loginURL = "auth/local/"
 userURL = "api/users/me"
 communityListURL = "api/users/myRegistrations"
-communityURL = paste0("api/communities/", communityId)
-asAuthorURL = paste0("api/authors/", communityId, "/me")
-communityViewsURL = paste0("api/communities/", communityId, "/views")
-communityAuthorsURL = paste0("api/communities/", communityId, "/authors")
-communityViewsURL = paste0("api/communities/", communityId, "/views")
-communityGroupsURL = paste0("api/communities/", communityId, "/groups")
-communityObjectsURL = paste0("api/contributions/", communityId, "/search")
-communityRecordsURL = paste0("api/records/search/", communityId)
+# communityURL = paste0("api/communities/", communityId)
+# asAuthorURL = paste0("api/authors/", communityId, "/me")
+# communityViewsURL = paste0("api/communities/", communityId, "/views")
+# communityAuthorsURL = paste0("api/communities/", communityId, "/authors")
+# communityViewsURL = paste0("api/communities/", communityId, "/views")
+# communityGroupsURL = paste0("api/communities/", communityId, "/groups")
+# communityObjectsURL = paste0("api/contributions/", communityId, "/search")
+# communityRecordsURL = paste0("api/records/search/", communityId)
 
 #' Generate a API call url by combining the base url and the path
 #' 
@@ -47,8 +44,8 @@ get_url <- function(path) {
 #' @param token API token
 #' 
 #' @return Object from the GET request
-GET_request <- function(url, token) {
-  resp = GET(url, add_headers(authorization = paste0("Bearer ", token)))
+GET_request <- function(url, token=NULL) {
+  resp = GET(url, ua, add_headers(authorization = paste0("Bearer ", token)))
   
   if (http_type(resp) != "application/json") {
     stop("API did not return json", call. = FALSE)
@@ -57,9 +54,13 @@ GET_request <- function(url, token) {
   jsonlite::fromJSON(content(resp, "text"), simplifyVector = FALSE)
 }
 
-POST_request <- function(url, query, token) {
-  resp = POST(url, query = query, 
-              add_headers(authorization = paste0("Bearer ", token)))
+POST_request <- function(url, token, body) {
+  resp = POST(url,
+              ua,
+              accept_json(),
+              body = body,
+              add_headers(authorization = paste0("Bearer ", token)),
+              encode = "json")
   
   if (http_type(resp) != "application/json") {
     stop("API did not return json", call. = FALSE)
@@ -98,14 +99,24 @@ get_communities <- function(token) {
   url = get_url(communityListURL)
   parsed = GET_request(url, token)
   
-  sapply(parsed, function(c) {
+  results = sapply(parsed, function(c) {
     c(id=c$communityId, title=c[["_community"]]$title)
   }) %>% t() %>% data.frame()
+  
+  structure(
+    list(
+      content = results,
+      url = url
+    ),
+    class = "kf6_api"
+  )
 }
 
 #' Select a community
 #' 
 #' @param id Community id
+#' 
+#' @return A list object containing info about the community
 set_community <- function(id) {
   communityId = id
   # communityId = "5924524e58316b59392b3edd"
@@ -118,50 +129,146 @@ set_community <- function(id) {
 #' @return A list containing relevant info
 get_community <- function(token) {
   url = get_url(paste0("api/communities/", communityId))
-  GET_request(url, token)
+  parsed = GET_request(url, token)
+  
+  structure(
+    list(
+      content = parsed,
+      url = url
+    ),
+    class = "kf6_api"
+  )
 }
 
-get_me <- function(token) {
+#' Get info about the current authenticated user
+#' 
+#' @param token Authenticated token
+#' 
+#' @return A list object
+get_myself <- function(token) {
   url = get_url("api/users/me")
-  GET_request(url, token)
+  parsed = GET_request(url, token)
+  
+  structure(
+    list(
+      content = parsed,
+      url = url
+    ),
+    class = "kf6_api"
+  )
 }
 
-get_me_as_author <- function(token) {
+#' Get the author object of the current authenticated user
+#' 
+#' @param token Authenticated token
+#' 
+#' @return A list object
+get_myself_as_author <- function(token) {
   url = get_url(paste0("api/authors/", communityId, "/me"))
   GET_request(url, token)
 }
 
+#' Get all views in the community
+#' 
+#' @param token Authenticated token
+#' 
+#' @return A list of views in the community
 get_views <- function(token) {
   url = get_url(paste0("api/communities/", communityId, "/views"))
   GET_request(url, token)
 }
 
+#' Get all authors in the community
+#' 
+#' @param token Authenticated token
+#' 
+#' @return A list of authors in the community
 get_authors <- function(token) {
   url = get_url(paste0("api/communities/", communityId, "/authors"))
   GET_request(url, token)
 }
 
+#' Get all user groups in the community
+#' 
+#' @param token Authenticated token
+#' 
+#' @return A list of user groups in the community
 get_groups <- function(token) {
   url = get_url(paste0("api/communities/", communityId, "/groups"))
   GET_request(url, token)
 }
 
-get_object_counts <- function(token, query=NULL) {
-  query = list(pagesize = 10000, searchMode = "title")
-  url = get_url(paste0("api/communities/", communityId, "/search/count"))
-  POST_request(url, query, token)
+#' Count objects in the community
+#' 
+#' @param token Authenticated token
+#' 
+#' @return Count of all objects in the community
+get_objects_count <- function(token, body=NULL) {
+  url = get_url(paste0("api/contributions/", communityId, "/search/count"))
+  body = list("query" = list(
+    "pagesize" = 10000,
+    "searchMode" = "title"))
+  
+  resp = POST_request(url, token, body)
+  
+  structure(
+    list(
+      content = resp,
+      url = url
+    ),
+    class = "kf6_api"
+  )
 }
 
-get_objects <- function(token, query=NULL) {
-  query = list(pagesize = "10000", 
-               searchMode = "title",
-               contentType = 'application/json',
-               dataType = 'json')
-  url = get_url(paste0("api/communities/", communityId, "/search"))
+#' Get all objects from the community
+#' 
+#' @param token Authenticated token
+#' 
+#' @return A list of all objects from the community
+get_objects <- function(token, body=NULL) {
+  url = get_url(paste0("api/contributions/", communityId, "/search"))
+  body = list(
+    "contentType" = "application/json",
+    "dataType" = "json",
+    "query" = list(
+      "pagesize" = 1000,
+      "searchMode" = "title"))
+  # resp = POST(url,
+  #             accept_json(),
+  #             body = body,
+  #             add_headers(authorization = paste0("Bearer ", token)),
+  #             encode = "json")
   
-  resp = POST(url, query = query,
-              add_headers(authorization = paste0("Bearer ", token)))
-  POST_request(url, query, token)
+  resp = POST_request(url, token, body)
+  
+  structure(
+    list(
+      content = resp,
+      url = url
+    ),
+    class = "kf6_api"
+  )
+}
+
+#' Get all records from the community
+#' 
+#' @param token Authenticated token
+#' 
+#' @return All records in this community
+get_records <- function(token, body="") {
+  url = get_url(paste0("api/records/search/", communityId))
+  body = list("contentType" = "application/json",
+              "dataType" = "json")
+  
+  resp = POST_request(url, token, body)
+  
+  structure(
+    list(
+      content = resp,
+      url = url
+    ),
+    class = "kf6_api"
+  )
 }
 
 get_links_from <- function(fromId, token) {

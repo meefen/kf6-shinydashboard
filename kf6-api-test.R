@@ -1,15 +1,24 @@
 
-resp <- kf6_api(loginURL)
-http_type(resp)
+source("kf6-api.R")
 
+baseURL = "https://kf6.ikit.org/"
+token = NA
+communityId = NA
+uname = "bodong.chen@gmail.com"
+pword = "xxx"
 
-GET(get_url(loginURL), authenticate(uname, pword), add_headers(authorization = token))
+token = login(baseURL, uname, pword)
+get_communities(token)
 
-resp = POST(get_url(loginURL), query = list(userName = uname, password=pword), encode = "json")
-http_type(resp)
-token = jsonlite::fromJSON(content(resp, "text"))$token
+communityId = "5924524e58316b59392b3edd"
+comm = get_community(token)
 
+user = get_myself(token)
+author = get_myself_as_author(token)
 
-comms = GET(get_url(communityListURL), 
-            add_headers(authorization = paste0("Bearer ", token)))
-results = jsonlite::fromJSON(content(comms, "text"), simplifyVector = FALSE)
+views = get_views(token)
+
+comm_objs = get_objects(token)
+authors = get_authors(token)
+
+get_records(token)

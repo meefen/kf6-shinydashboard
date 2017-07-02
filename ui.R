@@ -59,11 +59,10 @@ body <- dashboardBody(
             
             # infoBoxes with fill=FALSE
             fluidRow(
-              # A static infoBox
-              infoBoxOutput("communityBox"),
-              # Dynamic infoBoxes
-              infoBoxOutput("writingBox"),
-              infoBoxOutput("readingBox")
+              valueBoxOutput("communityBox"),
+              valueBoxOutput("socialBox"),
+              valueBoxOutput("writingBox")
+              # valueBoxOutput("readingBox")
             )
             
             # # infoBoxes with fill=TRUE

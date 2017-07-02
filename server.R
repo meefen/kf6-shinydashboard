@@ -56,10 +56,33 @@ server <- shinyServer(function(input, output, session) {
   })
   
   #' Count of notes authored - info box
-  output$communityBox <- renderInfoBox({
-    infoBox("Communities", 
-            nrow(get_communities(get_token())), 
-            icon = icon("credit-card"))
+  output$communityBox <- renderValueBox({
+    count = nrow(get_communities(get_token()))
+    
+    valueBox(
+      value = count,
+      subtitle = "# Communities",
+      icon = icon("object-group"),
+      color = if (count >= 5) "yellow" else "aqua"
+    )
+  })
+  
+  output$socialBox <- renderValueBox({
+    valueBox(
+      15,
+      "# Peers Connected",
+      icon = icon("users")
+    )
+  })
+  
+  output$writingBox <- renderValueBox({
+    count = 2
+    valueBox(
+      count,
+      "# Notes Written",
+      icon = icon("pencil"),
+      color = if (count < 5) "red" else {if (count < 10) "yellow" else "aqua"}
+    )
   })
   
   output$plot1 <- renderPlot({
